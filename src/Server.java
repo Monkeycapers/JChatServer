@@ -106,6 +106,7 @@ public class Server {
             boolean auth = false;
             boolean sendSecretMessage = false;
             String smessage = "";
+            Rank rank = Rank.Guest;
             while (running) {
                 try {
                     if (sendSecretMessage) {
@@ -130,13 +131,41 @@ public class Server {
                             message = "[Guest] " + line;
                         }
                         else {
-                            message = line;
+                            message = "[" + rank.name() + "]" + line;
                         }
                         System.out.println(line);
                     }
                     else if (line.contains("userlist")) {
                         smessage = clientFactory.getPlayerList();
                         sendSecretMessage = true;
+                    }
+                    else if (line.contains("stop")) {
+                        if (rank.equals(Rank.Admin)  || rank.equals(Rank.Op)) {
+                            System.exit(2);
+                        }
+                        else {
+                            smessage = "You are not privileged enough for this command.";
+                            sendSecretMessage = true;
+                        }
+                    }
+                    else if (line.contains("auth")) {
+                        if (rank.equals(Rank.Guest)) {
+                            String[] split = line.split("\\,");
+
+                            rank = Authenticate.login(split[2], split[3]);
+                            if (rank.equals(Rank.Guest)) {
+                                smessage = "Invalid user or pass.";
+                            }
+                            else {
+                                auth = true;
+                                smessage = "You have logged in. You are a: " + rank.name();
+                            }
+                            sendSecretMessage = true;
+                        }
+                        else {
+                            smessage = "You are already logged in!";
+                            sendSecretMessage = true;
+                        }
                     }
 
                 }
