@@ -12,7 +12,7 @@ public class Server {
     String message = "Welcome to JChat";
 
     public Server() {
-        clientFactory = new ClientFactory(16000);
+        clientFactory = new ClientFactory(16000, 1000);
         clientFactory.run();
     }
 
@@ -22,9 +22,12 @@ public class Server {
 
     private class ClientFactory implements Runnable {
         int portNumber;
-        public ClientFactory(int portNumber) {
+        ClientWorker[] workers;
+        int amountConnected;
+        public ClientFactory(int portNumber, int maxPlayers) {
             this.portNumber = portNumber;
-
+            workers = new ClientWorker[maxPlayers];
+            amountConnected = 0;
         }
         public void run() {
             //Create client workers
@@ -47,6 +50,9 @@ public class Server {
                     Thread t = new Thread(w);
                     t.start();
                     System.out.println("Started the connection");
+                    workers[amountConnected] = w;
+                    amountConnected ++;
+                    //TODO: Detect client disconnects
 
                 }
                 catch (Exception e) {
@@ -57,11 +63,25 @@ public class Server {
                 }
             }
         }
+        public String getPlayerList () {
+            String pl = "";
+            for (ClientWorker w: workers) {
+                try {
+                    pl += w.nick + "\n";
+                }
+                catch (NullPointerException e) {
+
+                }
+            }
+            return pl;
+        }
     }
 
     private class ClientWorker implements Runnable {
 
         private Socket client;
+
+        String nick = "Anon";
 
         public ClientWorker (Socket client) {
             System.out.println("Got a client");
@@ -84,9 +104,18 @@ public class Server {
             //
             boolean running = true;
             boolean auth = false;
+            boolean sendSecretMessage = false;
+            String smessage = "";
             while (running) {
                 try {
-                    out.writeUTF(message);
+                    if (sendSecretMessage) {
+                        out.writeUTF("[Server] to you: " + smessage);
+                        sendSecretMessage = false;
+                    }
+                    else {
+                        out.writeUTF(message);
+                    }
+
                 }
                 catch (IOException e) {
                     System.out.println("Could not send a message");
@@ -95,6 +124,7 @@ public class Server {
 
                 try {
                     line = in.readUTF();
+                    nick = line.split("\\,")[0];
                     if (line.charAt(0) == '<') {
                         if (!auth) {
                             message = "[Guest] " + line;
@@ -103,6 +133,10 @@ public class Server {
                             message = line;
                         }
                         System.out.println(line);
+                    }
+                    else if (line.contains("userlist")) {
+                        smessage = clientFactory.getPlayerList();
+                        sendSecretMessage = true;
                     }
 
                 }
@@ -115,53 +149,6 @@ public class Server {
 
                 try {Thread.sleep(1000); } catch (Exception ex) { }
             }
-
         }
     }
-
-    private class MessageReceiver implements Runnable {
-        DataInputStream in;
-        public MessageReceiver(DataInputStream in) {
-            this.in = in;
-        }
-        public void run() {
-            String line;
-            boolean running = true;
-            while (running) {
-                try {
-                    line = in.readUTF();
-                    if (line.charAt(0) == '<') {
-                        message = line;
-                        System.out.println(line);
-                    }
-
-                }
-                catch (IOException e) {
-                    System.out.println("Could not receive a message");
-                    running = false;
-                }
-
-            }
-        }
-    }
-
-    private class MessageSender implements Runnable {
-        DataOutputStream out;
-        public MessageSender(DataOutputStream out) {
-            this.out = out;
-        }
-        public void run() {
-            boolean running = true;
-            while (running) {
-                try {
-                    out.writeUTF(message);
-                }
-                catch (IOException e) {
-                    System.out.println("Could not send a message");
-                    running = false;
-                }
-            }
-        }
-    }
-
 }
