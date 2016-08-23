@@ -106,7 +106,8 @@ public class Server {
             boolean auth = false;
             boolean sendSecretMessage = false;
             String smessage = "";
-            Rank rank = Rank.Guest;
+            //Rank rank = Rank.Guest;
+            User user = new User();
             while (running) {
                 try {
                     if (sendSecretMessage) {
@@ -120,6 +121,7 @@ public class Server {
                 }
                 catch (IOException e) {
                     System.out.println("Could not send a message");
+                    //TODO: This is a client disconnect, tell clientfactory that this spot is free
                     running = false;
                 }
 
@@ -127,11 +129,12 @@ public class Server {
                     line = in.readUTF();
                     nick = line.split("\\,")[0];
                     if (line.charAt(0) == '<') {
+                        //Message
                         if (!auth) {
                             message = "[Guest] " + line;
                         }
                         else {
-                            message = "[" + rank.name() + "]" + line;
+                            message = "[" + user.rank.name() + "] " + line;
                         }
                         System.out.println(line);
                     }
@@ -140,7 +143,7 @@ public class Server {
                         sendSecretMessage = true;
                     }
                     else if (line.contains("stop")) {
-                        if (rank.equals(Rank.Admin)  || rank.equals(Rank.Op)) {
+                        if (user.rank.equals(Rank.Admin)  || user.rank.equals(Rank.Op)) {
                             System.exit(2);
                         }
                         else {
@@ -149,16 +152,17 @@ public class Server {
                         }
                     }
                     else if (line.contains("auth")) {
-                        if (rank.equals(Rank.Guest)) {
+                        if (user.rank.equals(Rank.Guest)) {
                             String[] split = line.split("\\,");
 
-                            rank = Authenticate.login(split[2], split[3]);
-                            if (rank.equals(Rank.Guest)) {
+                            user.rank = Authenticate.login(split[2], split[3]);
+                            if (user.rank.equals(Rank.Guest)) {
                                 smessage = "Invalid user or pass.";
                             }
                             else {
                                 auth = true;
-                                smessage = "You have logged in. You are a: " + rank.name();
+                                user.username = split[2];
+                                smessage = "You have logged in. You are a: " + user.rank.name();
                             }
                             sendSecretMessage = true;
                         }
@@ -166,6 +170,32 @@ public class Server {
                             smessage = "You are already logged in!";
                             sendSecretMessage = true;
                         }
+                    }
+                    else if (line.contains("signup")) {
+                        if (user.rank.equals(Rank.Guest)) {
+                            String[] split = line.split("\\,");
+
+                            user.rank = Authenticate.signup(split[2], split[3]);
+                            if (user.rank.equals(Rank.Guest)) {
+                                smessage = "User already exists";
+                            }
+                            else {
+                                auth = true;
+                                user.username = split[2];
+                                smessage = "You have signed up and logged in. You are a: " + user.rank.name();
+                            }
+                            sendSecretMessage = true;
+                        }
+                        else {
+                            smessage = "You are already logged in!";
+                            sendSecretMessage = true;
+                        }
+                    }
+                    else if (line.contains("promote")) {
+                        Promote cmdPromote = new Promote();
+                        String[] split = line.split("\\,");
+                        System.out.println("test");
+                        System.out.println(cmdPromote.invoke(user, new User(Rank.valueOf(split[3]), split[2])));
                     }
 
                 }
